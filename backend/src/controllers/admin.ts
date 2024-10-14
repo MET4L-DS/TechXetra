@@ -5,6 +5,7 @@ import { StatusCodes } from "http-status-codes";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { CustomRequest } from '../middleware/auth_middleware';
+import mongoose from 'mongoose';
 
 const generateAccessToken = (user: IUser) => {
 	const secret = process.env.ACCESS_TOKEN_SECRET || "default-secret";
@@ -167,26 +168,39 @@ export const getEventsEnrolledByUser = async (
 }
 
 export const isUserEnrolled = async (
-        req: CustomRequest,
-        res: Response,
-        next: NextFunction
-    ) => {
-    const { event_id, user_id  } = req.params
+    req: CustomRequest,
+    res: Response,
+    next: NextFunction
+) => {
+    const { event_id, user_id } = req.params;
+
     try {
-        const getUser = await userModel.findById(user_id)
-        if (getUser?.events.includes(event_id)) {
+        const getUser = await userModel.findById(user_id);
+
+        if (!getUser) {
+            return res.status(StatusCodes.NOT_FOUND).json({
+                message: 'User not found',
+            });
+        }
+
+        const eventObjectId = new mongoose.Types.ObjectId(event_id); // Convert event_id to ObjectId
+
+        // Check if the event_id is present in the user's events array
+        const isEnrolled = getUser.events.some(event => event.equals(eventObjectId));
+
+        if (isEnrolled) {
             res.status(StatusCodes.OK).json({
-                message: 'User is enrolled'
+                message: 'User is enrolled',
             });
         } else {
             res.status(StatusCodes.NOT_FOUND).json({
-                message: 'User is not enrolled'
+                message: 'User is not enrolled',
             });
         }
     } catch (error) {
         next(error);
     }
-}
+};
 
 export const userVerification = async (
         req: CustomRequest,
